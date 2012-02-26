@@ -243,6 +243,15 @@ http.createServer(function(req, resp) {
       return;
     }
     getHistory(from, to, function(history) {
+      if (u.query.skip && !isNaN(Number(u.query.skip))) {
+        var pos = 0;
+        for (var i = Number(u.query.skip); i > 0; --i) {
+          var nl = history.indexOf("\n", pos);
+          if (nl == -1) { pos = history.length; break; }
+          pos = nl + 1;
+        }
+        history = history.slice(pos);
+      }
       if (history || to) sendText(resp, history);
       else waiting.push({since: (new Date).getTime(), resp: resp});
     });

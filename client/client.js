@@ -37,15 +37,16 @@ function sendCommand(cmd, args) {
   httpRequest(url, {body: body, method: "POST"}, function() {}, failed);
 }
 
-function getHistory(from, to, c, err) {
-  httpRequest(document.location.href + "history?from=" + from + (to ? "&to=" + to : ""),
+function getHistory(from, to, skip, c, err) {
+  httpRequest(document.location.href + "history?from=" + from +
+              (to ? "&to=" + to : "") + (skip ? "&skip=" + skip : ""),
               {}, c, err);
 }
 
 var knownHistory = [], knownUpto = time();
 
 function fetchHistory() {
-  getHistory(knownUpto - (3600 * 24), null, function(history) {
+  getHistory(knownUpto - (3600 * 24), null, null, function(history) {
     knownHistory = history.split("\n");
     knownHistory.pop();
     if (knownHistory.length)
@@ -139,10 +140,6 @@ function addLines(lines) {
     if (knownLine == l1) { lines.splice(0, knownHistory.length - i); break; }
     if (timeFor(knownLine) < t1) { break; }
   }
-  if (!lines.length) {
-    knownUpto++;
-    return;
-  }
   var html = "", output = $("output");
   for (var i = 0; i < lines.length; ++i) {
     html += renderLine(lines[i]);
@@ -154,7 +151,11 @@ function addLines(lines) {
 }
 
 function poll(backOff) {
-  getHistory(knownUpto, null, function(lines) {
+  var skip = 0;
+  while (skip < knownHistory.length &&
+         timeFor(knownHistory[knownHistory.length - 1 - skip]) == knownUpto)
+    ++skip;
+  getHistory(knownUpto, null, skip, function(lines) {
     addLines(lines);
     poll();
   }, function() {
