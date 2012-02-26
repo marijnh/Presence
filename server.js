@@ -42,20 +42,51 @@ function openIRC(backoff) {
   client.addListener("registered", function(message) {
     console.log("Connected to " + server + (message ? ": " + message : ""));
   });
-  client.addListener("pm", function(from, message) {
-    logLine(">", from + ": " + message);
+  client.addListener("pm", function(from, text) {
+    logLine(">", from + ": " + text);
   });
-  client.addListener("message#" + channel, function(from, message) {
-    logLine("_", from + ": " + message);
+  client.addListener("message#" + channel, function(from, text) {
+    logLine("_", from + ": " + text);
   });
   client.addListener("error", function(message) {
+    if (message && message.command == "err_nosuchnick") {
+      notifyWaiting("whois " + message.args[1], "");
+      return;
+    }
     console.log("Error from " + server + (message ? ": " + message.command : ""));
     try { client.disconnect(); } catch(e) {}
     backoff = Math.max(30, backoff || 2);
     setTimeout(openIRC.bind(null, backoff * 2), backoff)
   });
+  client.addListener("names", function(channel, nicks) {
+    notifyWaiting("names", Object.keys(nicks).join(" "));
+  });
+  client.addListener("join#" + channel, function(nick) {
+    logLine("+", nick + ": joined");
+  });
+  client.addListener("part#" + channel, function(nick) {
+    logLine("-", nick + ": parted");
+  });
+  client.addListener("quit", function(nick, reason, channels) {
+    if (channels.indexOf("#" + channel) > -1) logLine("-", nick + ": " + reason);
+  });
+  client.addListener("kick#" + channel, function(nick, by, reason) {
+    logLine("-", nick + ": " + reason);
+  });
+  client.addListener("kill", function(nick, reason, channels) {
+    if (channels.indexOf("#" + channel) > -1) logLine("-", nick + ": " + reason);
+  });
+  client.addListener("notice", function(nick, to, text) {
+    logLine("n", (nick || "") + ": " + text);
+  });
+  client.addListener("nick", function(oldnick, newnick) {
+    logLine("x", oldnick + ": " + newnick);
+  });
+  client.addListener("whois", function(info) {
+    if (info) notifyWaiting("whois " + info.nick, JSON.stringify(info));
+  });
 }
-//openIRC();
+openIRC();
 
 function time() {
   return Math.floor((new Date).getTime() / 1000);
@@ -71,8 +102,7 @@ function logLine(tag, str) {
   var line = time() + " " + tag + " " + str + "\n";
   output.write(line);
   recentActivity.push(line);
-  waiting.forEach(function(w) {sendText(w.resp, line);});
-  waiting = [];
+  notifyWaiting("history", line);
   if (recentActivity.length > maxActivityLen) {
     recentActivity.splice(0, maxActivityLen >> 1);
     recentActivityStart = timeAt(recentActivity[0], 0);
@@ -161,6 +191,18 @@ function getHistory(from, to, c) {
 // Requests waiting for data
 var waiting = [];
 
+function addWaiting(type, resp) {
+  waiting.push({since: (new Date).getTime(), type: type, resp: resp});
+}
+function notifyWaiting(type, value) {
+  for (var i = 0; i < waiting.length; ++i) {
+    if (waiting[i].type == type) {
+      sendText(waiting[i].resp, value);
+      waiting.splice(i--, 1);
+    }
+  }
+}
+
 setInterval(function() {
   var cutOff = (new Date).getTime() - 40000;
   for (var i = 0; i < waiting.length; ++i) {
@@ -209,19 +251,15 @@ function sendText(resp, text) {
 }
 
 http.createServer(function(req, resp) {
-  var u = url.parse(req.url, true);
+  var u = url.parse(req.url, true), m;
   var path = u.pathname.slice(1);
   if (req.method == "GET" && path == "") {
     resp.writeHead(200, {"Content-Type": "text/html"});
     resp.write(instantiate("index.html", {nick: nick, chan: channel, server: server}));
     resp.end();
-  } else if (req.method == "POST" && path == "send") {
-    var command = u.query.cmd, args = u.query.arg || [];
-    if (typeof args == "string") args = [args];
-    if (command == null) {
-      err(resp, 400, "Missing parameter", "The 'cmd' parameter must be provided.");
-      return;
-    }
+  } else if (req.method == "POST" && (m = path.match(/^send\/([^\/]+)(?:\/(.*))?$/))) {
+    var command = decodeURIComponent(m[1]);
+    var args = m[2] ? m[2].split("/").map(decodeURIComponent) : [];
     getData(req, function(body) {
       body = body.replace(/[\n\r]/g, "");
       if (command == "PRIVMSG") {
@@ -236,6 +274,13 @@ http.createServer(function(req, resp) {
       resp.writeHead(204, {});
       resp.end();
     });
+  } else if (req.method == "GET" && path == "names") {
+    ircClient.send("NAMES", "#" + channel);
+    addWaiting("names", resp);
+  } else if (req.method == "GET" && (m = path.match(/^whois\/(.*)$/))) {
+    var name = decodeURIComponent(m[1]);
+    ircClient.send("WHOIS", m[1]);
+    addWaiting("whois " + name, resp);
   } else if (req.method == "GET" && path == "history") {
     var from = Number(u.query.from), to = u.query.to ? Number(u.query.to) : null;
     if (!from || isNaN(from) || isNaN(to)) {
@@ -253,7 +298,7 @@ http.createServer(function(req, resp) {
         history = history.slice(pos);
       }
       if (history || to) sendText(resp, history);
-      else waiting.push({since: (new Date).getTime(), resp: resp});
+      else addWaiting("history", resp);
     });
   } else if (req.method == "GET" && clientFile.hasOwnProperty(path)) {
     var info = clientFile[path];

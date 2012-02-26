@@ -14,6 +14,10 @@ div#output > div {
   padding: 0 .5em;
 }
 
+div#output > div.priv {
+  background: #eee;
+}
+
 div.name {
   position: absolute;
   width: 6.5em;

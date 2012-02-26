@@ -13,7 +13,7 @@ window.onload = function() {
       e.preventDefault();
     }
   });
-  fetchHistory();
+  fetchData();
 };
 
 function timeFor(str) {
@@ -33,9 +33,9 @@ function stopSend() {
 // API wrappers
 
 function sendCommand(cmd, args, body, done, backOff) {
-  var url = document.location.href + "send?cmd=" + encodeURIComponent(cmd);
+  var url = document.location.href + "send/" + encodeURIComponent(cmd);
   for (var i = 0; i < args.length; ++i)
-    url += "&arg=" + encodeURIComponent(args[i]);
+    url += "/" + encodeURIComponent(args[i]);
   httpRequest(url, {body: body, method: "POST"}, function() {done();}, function(msg) {
     console.log("Sending failed: " + msg);
     var time = Math.min((backOff || 2) * 2, 30);
@@ -49,9 +49,13 @@ function getHistory(from, to, skip, c, err) {
               {}, c, err);
 }
 
+function getNames(c, err) {
+  httpRequest(document.location.href + "names", {}, c, err);
+}
+
 var knownHistory = [], knownUpto;
 
-function fetchHistory() {
+function fetchData() {
   var start = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
   getHistory(start, null, null, function(history) {
     knownHistory = history.split("\n");
@@ -59,7 +63,11 @@ function fetchHistory() {
     if (knownHistory.length)
       knownUpto = timeFor(knownHistory[knownHistory.length - 1]);
     repaint();
-    poll();
+    getNames(function(names) {
+      curState.names = {};
+      forEach(names.split(" "), function(name) {curState.names[name] = true;});
+      poll();
+    }, function() {poll();});
   }, function(msg) {
     document.body.innerHTML = "Failed to connect to Presence server (" + msg + ")";
   });
@@ -76,9 +84,9 @@ function buildColor(hue, sat, light) {
   return "#" + hex(0) + hex(.33) + hex(.67);
 }
 
-var colors = {};
+var colors = {}, selfColor = "#8e98ff";
 function getColor(name) {
-  if (name == nick) return "#8e98ff";
+  if (name == nick) return selfColor;
   var cached = colors[name];
   if (cached) return cached;
 
@@ -103,19 +111,39 @@ function htmlEsc(s) {
   return scratchDIV.innerHTML;
 }
 
-var prevName;
-function renderLine(line) {
+var curState = {prevName: null, names: {}};
+
+function processLine(state, line) {
   var type = line.charAt(11), html = "";
-  if (type == "_" || type == ">") {
-    var col = line.indexOf(":", 13);
-    var name = line.slice(13, col), msg = line.slice(col + 1);
+  var col = line.indexOf(":", 13);
+  if (col > -1) var name = line.slice(13, col), msg = line.slice(col + 1);
+  else var msg = line.slice(13);
+
+  if (type == "_" || type == ">" || (type == "n" && name)) {
+    var newName = state.prevName != name;
     html += "<div style=\"border-left: 2px solid " + getColor(name) +
-      (name != prevName ? "; margin-top: 1px" : "") + "\">";
-    if (name != prevName) {
-      prevName = name;
+      (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") + ">";
+    if (newName) {
+      state.prevName = name;
       html += "<div class=name>" + htmlEsc(name) + "</div>";
     }
     html += htmlEsc(msg) + "</div>"
+  } else if (type == "<") {
+    var newName = state.prevName != "to " + name;
+    html += "<div style=\"border-left: 2px solid " + selfColor +
+      (newName ? "; margin-top: 1px" : "") + "\" class=priv>";
+    if (newName) {
+      state.prevName = "to " + name;
+      html += "<div class=name>⇝" + htmlEsc(name) + "</div>";
+    }
+    html += htmlEsc(msg) + "</div>"
+  } else if (type == "+") {
+    state.names[name] = true;
+  } else if (type == "-") {
+    state.names[name] = false;
+  } else if (type == "x") {
+    state.names[name] = false;
+    state.names[msg] = true;
   }
   return html;
 }
@@ -123,7 +151,7 @@ function renderLine(line) {
 function repaint() {
   var html = "";
   for (var i = 0, e = knownHistory.length; i < e; ++i)
-    html += renderLine(knownHistory[i]);
+    html += processLine(curState, knownHistory[i]);
   $("output").innerHTML = html;
 }
 
@@ -142,7 +170,7 @@ function addLines(lines) {
   knownUpto = timeFor(lines[lines.length - 1]);
   var html = "", output = $("output");
   for (var i = 0; i < lines.length; ++i) {
-    html += renderLine(lines[i]);
+    html += processLine(curState, lines[i]);
     knownHistory.push(lines[i]);
   }
   scratchDIV.innerHTML = html;
