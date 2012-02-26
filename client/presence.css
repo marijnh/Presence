@@ -1,0 +1,35 @@
+body {
+  font-family: sans-serif;
+  margin: 0 2em 0 7em;
+  
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 20pt;
+}
+
+div#output > div {
+  overflow: visible;
+  padding: 0 .5em;
+}
+
+div.name {
+  position: absolute;
+  width: 6.5em;
+  overflow: hidden;
+  left: 0em;
+  text-align: right;
+  z-index: 5;
+}
+
+textarea#input {
+  border: none;
+  border-left: 2px solid #8e98ff;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0 .5em;
+  margin-top: 1px;
+}
