@@ -6,7 +6,7 @@ var irc = require("irc"),
     url = require("url");
 
 function help() {
-  console.log("usage: " + process.argv[1] + " <server> <nick> <channel>");
+  console.log("usage: " + process.argv[1] + " <server> <nick> <channel> [--port <http port>]");
   process.exit(1);
 }
 
@@ -31,7 +31,7 @@ var logFile = "log_" + server + "_" + channel + ".txt";
 
 var output = fs.createWriteStream(logFile, {flags: "a"});
 
-var ircClient;
+var ircClient, ircClientOK = false;
 function openIRC(backoff) {
   console.log("Connecting to " + server);
   var client = ircClient = new irc.Client(server, nick, {
@@ -41,6 +41,7 @@ function openIRC(backoff) {
 
   client.addListener("registered", function(message) {
     console.log("Connected to " + server + (message ? ": " + message : ""));
+    ircClientOK = true;
   });
   client.addListener("pm", function(from, text) {
     logLine(">", from + ": " + text);
@@ -53,6 +54,7 @@ function openIRC(backoff) {
       notifyWaiting("whois " + message.args[1], "");
       return;
     }
+    ircClientOK = false;
     console.log("Error from " + server + (message ? ": " + message.command : ""));
     try { client.disconnect(); } catch(e) {}
     backoff = Math.max(30, backoff || 2);
@@ -258,6 +260,7 @@ http.createServer(function(req, resp) {
     resp.write(instantiate("index.html", {nick: nick, chan: channel, server: server}));
     resp.end();
   } else if (req.method == "POST" && (m = path.match(/^send\/([^\/]+)(?:\/(.*))?$/))) {
+    if (!ircClientOK) return err(resp, 500, "No IRC connection");
     var command = decodeURIComponent(m[1]);
     var args = m[2] ? m[2].split("/").map(decodeURIComponent) : [];
     getData(req, function(body) {
@@ -270,14 +273,16 @@ http.createServer(function(req, resp) {
       }
       args.unshift(command);
       args.push(body);
-      if (ircClient) ircClient.send.apply(ircClient, args);
+      ircClient.send.apply(ircClient, args);
       resp.writeHead(204, {});
       resp.end();
     });
   } else if (req.method == "GET" && path == "names") {
+    if (!ircClientOK) return err(resp, 500, "No IRC connection");
     ircClient.send("NAMES", "#" + channel);
     addWaiting("names", resp);
   } else if (req.method == "GET" && (m = path.match(/^whois\/(.*)$/))) {
+    if (!ircClientOK) return err(resp, 500, "No IRC connection");
     var name = decodeURIComponent(m[1]);
     ircClient.send("WHOIS", m[1]);
     addWaiting("whois " + name, resp);
