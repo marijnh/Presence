@@ -7,7 +7,8 @@ window.onload = function() {
       if (!val) return;
       input.value = "";
       forEach(val.split(/\r?\n/g), function(line) {
-        sendCommand("PRIVMSG", "#" + channel, line);
+        startSend();
+        sendCommand("PRIVMSG", ["#" + channel], line, stopSend);
       });
       e.preventDefault();
     }
@@ -15,26 +16,31 @@ window.onload = function() {
   fetchHistory();
 };
 
-function time() {
-  return Math.floor((new Date).getTime() / 1000);
-}
 function timeFor(str) {
   return Number(str.slice(0, 10));
 }
 
-// API wrappers
-
-function failed(msg, xhr) {
-  // FIXME
-  alert("BAD! " + msg);
+var sendDepth = 0;
+function startSend() {
+  if (!sendDepth) $("input").style.background = "#eee";
+  sendDepth++;
+}
+function stopSend() {
+  sendDepth--;
+  if (!sendDepth) $("input").style.background = "";
 }
 
-function sendCommand(cmd, args) {
+// API wrappers
+
+function sendCommand(cmd, args, body, done, backOff) {
   var url = document.location.href + "send?cmd=" + encodeURIComponent(cmd);
-  var body = arguments[arguments.length - 1];
-  for (var i = 1; i < arguments.length - 1; ++i)
-    url += "&arg=" + encodeURIComponent(arguments[i]);
-  httpRequest(url, {body: body, method: "POST"}, function() {}, failed);
+  for (var i = 0; i < args.length; ++i)
+    url += "&arg=" + encodeURIComponent(args[i]);
+  httpRequest(url, {body: body, method: "POST"}, function() {done();}, function(msg) {
+    console.log("Sending failed: " + msg);
+    var time = Math.min((backOff || 2) * 2, 30);
+    setTimeout(function() {sendCommand(cmd, args, done, time);}, time * 1000);
+  });
 }
 
 function getHistory(from, to, skip, c, err) {
@@ -43,10 +49,11 @@ function getHistory(from, to, skip, c, err) {
               {}, c, err);
 }
 
-var knownHistory = [], knownUpto = time();
+var knownHistory = [], knownUpto;
 
 function fetchHistory() {
-  getHistory(knownUpto - (3600 * 24), null, null, function(history) {
+  var start = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
+  getHistory(start, null, null, function(history) {
     knownHistory = history.split("\n");
     knownHistory.pop();
     if (knownHistory.length)
@@ -133,13 +140,6 @@ function addLines(lines) {
   lines = lines.split("\n");
   lines.pop();
   knownUpto = timeFor(lines[lines.length - 1]);
-  var l1 = lines[0], t1 = timeFor(l1);
-  // Strip out lines we already saw
-  for (var i = knownHistory.length - 1; i >= 0; --i) {
-    var knownLine = knownHistory[i];
-    if (knownLine == l1) { lines.splice(0, knownHistory.length - i); break; }
-    if (timeFor(knownLine) < t1) { break; }
-  }
   var html = "", output = $("output");
   for (var i = 0; i < lines.length; ++i) {
     html += renderLine(lines[i]);
