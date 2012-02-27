@@ -62,6 +62,7 @@ window.onload = function() {
   });
   connect(window, "focus", function() { winFocused = true; })
   connect(window, "blur", function() { winFocused = false; })
+  connect(document.getElementById("loadmore"), "click", loadMore);
   fetchData();
 };
 
@@ -118,12 +119,12 @@ function timeFor(str) {
 
 var sendDepth = 0;
 function startSend() {
-  if (!sendDepth) input.style.background = "#eee";
+  if (!sendDepth) input.className = "loading";
   sendDepth++;
 }
 function stopSend() {
   sendDepth--;
-  if (!sendDepth) input.style.background = "";
+  if (!sendDepth) input.className = "";
 }
 
 // API wrappers
@@ -161,11 +162,11 @@ function setBookmark(val, c, err) {
   httpRequest(document.location.href + "bookmark", {method: "PUT", body: String(val)}, c, err);
 }
 
-var knownHistory = [], knownUpto;
+var knownHistory = [], knownUpto, knownFrom;
 
 function fetchData() {
-  var start = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
-  getHistory(start, null, null, function(history) {
+  var yesterday = knownFrom = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
+  getHistory(yesterday, null, null, function(history) {
     knownHistory = history.split("\n");
     knownHistory.pop();
     if (knownHistory.length)
@@ -192,6 +193,29 @@ function fetchData() {
   }, function(msg) {
     document.body.innerHTML = "Failed to connect to Presence server (" + msg + ")";
   });
+}
+
+function loadMore() {
+  var elt = document.getElementById("loadmore");
+  elt.className = "loading";
+  var from = knownFrom - 3600 * 24;
+  getHistory(from, knownFrom, null, function(history) {
+    elt.className = "";
+    var lines = history.split("\n");
+    lines.pop();
+    var tempState = {prevName: null, names: {}}, nodes = [];
+    for (var i = 0, e = lines.length; i < e; ++i) {
+      var node = processLine(tempState, lines[i]);
+      if (node) nodes.push(node);
+    }
+    var height = bodyHeight();
+    while (nodes.length) output.insertBefore(nodes.pop(), output.firstChild);
+    window.scrollBy(0, bodyHeight() - height);
+    lines.unshift(0);
+    lines.unshift(0);
+    knownHistory.splice.apply(knownHistory, lines);
+    knownFrom = from;
+  }, function() { elt.className = ""; });
 }
 
 var closeStatusOnInput = false;
@@ -288,7 +312,7 @@ function processLine(state, line) {
     scratchDiv.innerHTML = html;
     var node = scratchDiv.firstChild;
     node.logLine = line;
-    if (direct) {
+    if (direct && state.unread) {
       state.unread.push(node);
       if (state == curState) updateTitle();
     }

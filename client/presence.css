@@ -44,6 +44,17 @@ textarea#input {
   margin-top: 3px;
 }
 
+div#loadmore {
+  color: #888;
+  cursor: pointer;
+  padding: 0 .5em;
+  text-align: right;
+}
+
+.loading {
+  background: #eee;
+}
+
 div#statuswrap {
   overflow: hidden;
   height: 0px;
