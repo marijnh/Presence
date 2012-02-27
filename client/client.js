@@ -263,6 +263,8 @@ function buildColor(hue, sat, light) {
 var colors = {}, selfColor = "#34c2c9";
 function getColor(name) {
   if (name == nick) return selfColor;
+  while (name && !/[a-z]/.test(name.charAt(0))) name = name.slice(1);
+  while (name && !/[a-z]/.test(name.charAt(name.length - 1))) name = name.slice(0, name.length - 1);
   var cached = colors[name];
   if (cached) return cached;
 
