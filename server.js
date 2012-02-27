@@ -14,7 +14,7 @@ if (process.argv.length < 5) help();
 
 var server = process.argv[2];
 var nick = process.argv[3];
-var channel = process.argv[4];
+var channel = "#" + process.argv[4];
 var port = 8080;
 
 var debug = true;
@@ -27,7 +27,7 @@ for (var i = 5; i < process.argv.length; ++i) {
   } else help();
 }
 
-var logFile = "log_" + server + "_" + channel + ".txt";
+var logFile = "log_" + server + "_" + channel.slice(1) + ".txt";
 
 var output = fs.createWriteStream(logFile, {flags: "a"});
 
@@ -36,7 +36,7 @@ function openIRC(backoff) {
   console.log("Connecting to " + server);
   var client = ircClient = new irc.Client(server, nick, {
     realName: "Presence bot",
-    channels: ["#" + channel]
+    channels: [channel]
   });
 
   client.addListener("registered", function(message) {
@@ -46,7 +46,7 @@ function openIRC(backoff) {
   client.addListener("pm", function(from, text) {
     logLine(">", from + ": " + text);
   });
-  client.addListener("message#" + channel, function(from, text) {
+  client.addListener("message" + channel, function(from, text) {
     logLine("_", from + ": " + text);
   });
   client.addListener("error", function(message) {
@@ -63,20 +63,20 @@ function openIRC(backoff) {
   client.addListener("names", function(channel, nicks) {
     notifyWaiting("names", Object.keys(nicks).join(" "));
   });
-  client.addListener("join#" + channel, function(nick) {
+  client.addListener("join" + channel, function(nick) {
     logLine("+", nick + ": joined");
   });
-  client.addListener("part#" + channel, function(nick) {
+  client.addListener("part" + channel, function(nick) {
     logLine("-", nick + ": parted");
   });
   client.addListener("quit", function(nick, reason, channels) {
-    if (channels.indexOf("#" + channel) > -1) logLine("-", nick + ": " + reason);
+    if (channels.indexOf(channel) > -1) logLine("-", nick + ": " + reason);
   });
-  client.addListener("kick#" + channel, function(nick, by, reason) {
+  client.addListener("kick" + channel, function(nick, by, reason) {
     logLine("-", nick + ": " + reason);
   });
   client.addListener("kill", function(nick, reason, channels) {
-    if (channels.indexOf("#" + channel) > -1) logLine("-", nick + ": " + reason);
+    if (channels.indexOf(channel) > -1) logLine("-", nick + ": " + reason);
   });
   client.addListener("notice", function(nick, to, text) {
     logLine("n", (nick || "") + ": " + text);
@@ -266,7 +266,7 @@ http.createServer(function(req, resp) {
     getData(req, function(body) {
       body = body.replace(/[\n\r]/g, "");
       if (command == "PRIVMSG") {
-        if (args[0] == "#" + channel)
+        if (args[0] == channel)
           logLine("_", nick + ": " + body);
         else
           logLine("<", args[0] + ": " + body);
@@ -279,7 +279,7 @@ http.createServer(function(req, resp) {
     });
   } else if (req.method == "GET" && path == "names") {
     if (!ircClientOK) return err(resp, 500, "No IRC connection");
-    ircClient.send("NAMES", "#" + channel);
+    ircClient.send("NAMES", channel);
     addWaiting("names", resp);
   } else if (req.method == "GET" && (m = path.match(/^whois\/(.*)$/))) {
     if (!ircClientOK) return err(resp, 500, "No IRC connection");

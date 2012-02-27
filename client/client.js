@@ -12,7 +12,7 @@ window.onload = function() {
         commands[cmd[1]](cmd[2]);
       } else {
         forEach(val.split(/\r?\n/g), function(line) {
-          sendCommand("PRIVMSG", ["#" + channel], line);
+          sendCommand("PRIVMSG", [channel], line);
         });
       }
       e.preventDefault();
@@ -32,7 +32,7 @@ var commands = {
     if (m) sendCommand("PRIVMSG", [m[1]], m[2]);
   },
   "me": function(line) {
-    sendCommand("PRIVMSG", ["#" + channel], "\01ACTION " + line + "\01");
+    sendCommand("PRIVMSG", [channel], "\01ACTION " + line + "\01");
   },
   "whois": whoIs,
   "names": function() {
