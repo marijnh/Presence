@@ -30,7 +30,7 @@ div.name {
 
 textarea#input {
   border: none;
-  border-left: 2px solid #8e98ff;
+  border-left: 2px solid silver;
   outline: none;
   width: 100%;
   font-family: inherit;
@@ -65,7 +65,7 @@ div#status {
   color: #666;
 }
 
-div.names {
+div.names, div.completions {
   -webkit-column-width: 15em;
   -moz-column-width: 15em;
   -ie-column-width: 15em;

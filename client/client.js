@@ -1,7 +1,7 @@
 // Initialization
 window.onload = function() {
   var input = $("input");
-  connect(input, "keypress", function(e) {
+  connect(input, "keydown", function(e) {
     if (closeStatusOnInput) setStatus("");
     if (e.keyCode == 13 && !e.shiftKey) {
       var val = input.value;
@@ -16,15 +16,54 @@ window.onload = function() {
         });
       }
       e.preventDefault();
+    } else if (e.keyCode == 32 && e.ctrlKey) {
+      e.preventDefault();
+      var val = input.value;
+      if (!val && curState.lastDirect) {
+        var str = "/msg " + curState.lastDirect + " ";
+        input.value = str;
+        input.setSelectionRange(str.length, str.length);
+      } else {
+        var cur = input.selectionStart, start = cur;
+        while (start && /\w/.test(val.charAt(start - 1))) --start;
+        console.log(cur, start, val);
+        var completions = [], frag = val.slice(start, cur);
+        if (start && val.charAt(start - 1) == "/") {
+          --start;
+          forEachIn(commands, function(key) {
+            if (key.slice(0, frag.length) == frag) completions.push("/" + key);
+          });
+        } else {
+          forEachIn(curState.names, function(key) {
+            if (key.slice(0, frag.length) == frag) completions.push(key + ":");
+          });
+        }
+        if (completions.length == 1) {
+          complete(start, completions[0]);
+        } else if (completions.length > 1) {
+          var html = "<div class=completions data-start=" + start + ">";
+          forEach(completions, function(c) { console.log(c); html += "<div>" + htmlEsc(c) + "</div>"; })
+          setStatus(html + "</div>", true);
+        }
+      }
     }
   });
   connect($("statusclose"), "click", function(e) {setStatus("");});
   connect(document.body, "click", function(e) {
     if (e.target.parentNode.className == "names") whoIs(e.target.innerText);
     else if (e.target.className == "name") whoIs(e.target.innerText);
+    else if (e.target.parentNode.className == "completions")
+      complete(Number(e.target.parentNode.getAttribute("data-start")), e.target.innerText);
   });
   fetchData();
 };
+
+function complete(start, text) {
+  var input = $("input"), end = input.selectionStart, val = input.value;
+  input.value = val.slice(0, start) + text + " " + val.slice(end);
+  var cur = start + text.length + 1;
+  input.setSelectionRange(cur, cur);
+}
 
 var commands = {
   "msg": function(line) {
@@ -150,7 +189,7 @@ function buildColor(hue, sat, light) {
   return "#" + hex(0) + hex(.33) + hex(.67);
 }
 
-var colors = {}, selfColor = "#8e98ff";
+var colors = {}, selfColor = "silver";
 function getColor(name) {
   if (name == nick) return selfColor;
   var cached = colors[name];
@@ -197,6 +236,7 @@ function processLine(state, line) {
     if (act) html += "<em>" + htmlEsc(act[1]) + "</em></div>"
     else  html += htmlEsc(msg) + "</div>"
   } else if (type == "<") {
+    state.lastDirect = name;
     var newName = state.prevName != "to " + name;
     html += "<div style=\"border-left: 2px solid " + selfColor +
       (newName ? "; margin-top: 1px" : "") + "\" class=priv>";
