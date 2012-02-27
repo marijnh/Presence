@@ -202,9 +202,8 @@ function fetchData() {
       if (output.firstChild) 
         for (var cur = output.firstChild; cur; cur = cur.nextSibling)
           if (timeFor(cur.logLine) >= btime) break;
-      input.focus();
-      connect(window, "scroll", scrolled);
       if (output.lastChild) window.scrollTo(0, maxScroll = (cur || output.lastChild).offsetTop - 10);
+      connect(window, "scroll", scrolled);
 
       getNames(function(names) {
         curState.names = {};
