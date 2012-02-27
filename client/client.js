@@ -55,14 +55,27 @@ window.onload = function() {
   });
   connect(document.getElementById("statusclose"), "click", function(e) {setStatus("");});
   connect(document.body, "click", function(e) {
-    if (e.target.parentNode.className == "names") whoIs(e.target.innerText);
+    var pclass = e.target.parentNode && e.target.parentNode.className;
+    if (pclass == "names") whoIs(e.target.innerText);
     else if (e.target.className == "name") whoIs(e.target.innerText);
-    else if (e.target.parentNode.className == "completions")
+    else if (pclass == "completions")
       complete(Number(e.target.parentNode.getAttribute("data-start")), e.target.innerText);
   });
   connect(window, "focus", function() { winFocused = true; })
   connect(window, "blur", function() { winFocused = false; })
-  connect(document.getElementById("loadmore"), "click", loadMore);
+  connect(document.getElementById("loadday"), "click", function(){loadMore(1);});
+  connect(document.getElementById("loadweek"), "click", function(){loadMore(7);});
+  connect(document.body, "mouseover", function(e) {
+    if (e.target.parentNode == output) {
+      var n = e.target.appendChild(document.createElement("div"));
+      n.className = "date";
+      n.innerHTML = renderTime(timeFor(e.target.logLine));
+    }
+  });
+  connect(document.body, "mouseout", function(e) {
+    if (e.target.parentNode == output && e.target.lastChild.className == "date")
+      e.target.removeChild(e.target.lastChild);
+  });
   fetchData();
 };
 
@@ -115,6 +128,11 @@ function whoIs(name) {
 
 function timeFor(str) {
   return Number(str.slice(0, 10));
+}
+function renderTime(time) {
+  var d = new Date(time * 1000);
+  return d.getFullYear() + "/" + (d.getMonth() + 1) + "/" + d.getDate() + " " +
+    d.getHours() + ":" + (d.getMinutes() < 10 ? "0" : "") + d.getMinutes();
 }
 
 var sendDepth = 0;
@@ -197,10 +215,10 @@ function fetchData() {
   }, failed);
 }
 
-function loadMore() {
+function loadMore(days) {
   var elt = document.getElementById("loadmore");
   elt.className = "loading";
-  var from = knownFrom - 3600 * 24;
+  var from = knownFrom - 3600 * 24 * days;
   getHistory(from, knownFrom, null, function(history) {
     elt.className = "";
     var lines = history.split("\n");

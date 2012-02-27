@@ -44,6 +44,7 @@ var output = fs.createWriteStream(logFile, {flags: "a"});
 
 var ircClient, ircClientOK = false;
 function openIRC(backoff) {
+  backoff = backoff || 1;
   console.log("Connecting to " + server);
   var client = ircClient = new irc.Client(server, nick, {
     realName: realName,
@@ -51,6 +52,7 @@ function openIRC(backoff) {
   });
 
   client.addListener("registered", function(message) {
+    backoff = 1;
     console.log("Connected to " + server + (message ? ": " + message : ""));
     ircClientOK = true;
   });
@@ -68,8 +70,7 @@ function openIRC(backoff) {
     ircClientOK = false;
     console.log("Error from " + server + (message ? ": " + message.command : ""));
     try { client.disconnect(); } catch(e) {}
-    backoff = Math.max(30, backoff || 2);
-    setTimeout(openIRC.bind(null, backoff * 2), backoff)
+    setTimeout(openIRC.bind(null, Math.max(30, backoff) * 2), backoff)
   });
   client.addListener("names", function(channel, nicks) {
     notifyWaiting("names", Object.keys(nicks).join(" "));

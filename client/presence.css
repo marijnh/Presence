@@ -1,7 +1,6 @@
 body {
-  font-family: sans-serif;
+  font-family: ubuntu, sans-serif;
   margin: 0 2em 0 7em;
-  
 }
 
 h1 {
@@ -28,6 +27,14 @@ div.name {
   z-index: 5;
 }
 
+div.date {
+  position: absolute;
+  right: 3.5em;
+  font-size: 70%;
+  color: #888;
+  margin-top: -1.7em;
+}
+
 span.mention {
   color: #34c2c9;
   font-weight: bold;
@@ -35,7 +42,7 @@ span.mention {
 
 textarea#input {
   border: none;
-  border-left: 2px solid black;
+  border-left: 2px solid silver;
   outline: none;
   width: 100%;
   font-family: inherit;
@@ -46,9 +53,11 @@ textarea#input {
 
 div#loadmore {
   color: #888;
-  cursor: pointer;
   padding: 0 .5em;
   text-align: right;
+}
+div#loadmore > span {
+  cursor: pointer;
 }
 
 .loading {
