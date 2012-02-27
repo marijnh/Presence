@@ -290,44 +290,27 @@ function htmlEsc(s) {
 var curState = {prevName: null, names: {}, unread: []};
 
 function processLine(state, line) {
-  var type = line.charAt(11);
-  var col = line.indexOf(":", 13);
-  if (col > -1) var name = line.slice(13, col), msg = line.slice(col + 2);
-  else var msg = line.slice(13);
+  var type = line.charAt(11), col = line.indexOf(":", 13);
+  var name = line.slice(13, col), msg = line.slice(col + 2);
 
-  if (type == "_" || type == ">") {
-    var newName = state.prevName != name;
-    var html = "<div style=\"border-left: 2px solid " + getColor(name) +
-      (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") + ">";
+  function buildOutput(from, priv, direct, msg) {
+    var newName = state.prevName != from;
+    var html = "<div style=\"border-left: 2px solid " + getColor(from) +
+      (newName ? "; margin-top: 2px" : "") + "\"" + (priv ? " class=priv" : "") + ">";
     if (newName) {
-      state.prevName = name;
-      html += "<div class=name>" + htmlEsc(name) + "</div>";
+      state.prevName = from;
+      html += "<div class=name>" + htmlEsc(from) + "</div>";
     }
     var act = msg.match(/^\01ACTION (.*)\01$/);
     var msgHTML = act ? "<em>" + htmlEsc(act[1]) + "</em>" : htmlEsc(msg);
-    var direct = msgHTML.indexOf(nick) > -1;
-    if (direct) msgHTML = msgHTML.replace(nick, "<span class=mention>" + nick + "</span>");
-    if (type == ">") direct = true;
-    html += msgHTML + "</div>";
-  } else if (type == "<") {
-    state.lastDirect = name;
-    var newName = state.prevName != "to " + name;
-    var html = "<div style=\"border-left: 2px solid " + selfColor +
-      (newName ? "; margin-top: 1px" : "") + "\" class=priv>";
-    if (newName) {
-      state.prevName = "to " + name;
-      html += "<div class=name>⇝" + htmlEsc(name) + "</div>";
+    if (msgHTML.indexOf(nick) > -1) {
+      direct = true;
+      msgHTML = msgHTML.replace(nick, "<span class=mention>" + nick + "</span>");
     }
-    html += htmlEsc(msg) + "</div>"
-  } else if (type == "+") {
-    state.names[name] = true;
-  } else if (type == "-") {
-    state.names[name] = false;
-  } else if (type == "x") {
-    state.names[name] = false;
-    state.names[msg] = true;
-  }
-  if (html) {
+    msgHTML = msgHTML.replace(/\b((?:[a-z][\w-]+:(?:\/{1,3}|[a-z0-9%])|www\d{0,3}\.|[a-z0-9.\-]+\.[a-z]{2,4}\/)(?:[^\s()<>]+)+[^\s`!()\[\]{};:'".,<>?])\b/g, function(url) {
+      return "<a href=\"" + url + "\">" + url + "</a>";
+    });
+    html += msgHTML + "</div>";
     scratchDiv.innerHTML = html;
     var node = scratchDiv.firstChild;
     node.logLine = line;
@@ -336,6 +319,19 @@ function processLine(state, line) {
       if (state == curState) updateTitle();
     }
     return node;
+  }
+
+  if (type == "_" || type == ">") {
+    return buildOutput(name, type == ">", type == ">", msg);
+  } else if (type == "<") {
+    return buildOutput("⇝" + name, true, false, msg); 
+  } else if (type == "+") {
+    state.names[name] = true;
+  } else if (type == "-") {
+    state.names[name] = false;
+  } else if (type == "x") {
+    state.names[name] = false;
+    state.names[msg] = true;
   }
 }
 
