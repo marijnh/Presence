@@ -334,7 +334,7 @@ http.createServer(function(req, resp) {
   } else if (req.method == "PUT" && path == "bookmark") {
     getData(req, function(body) {
       var val = Number(body);
-      if (!val || isNaN(val)) return err("Not a valid bookmark");
+      if (!val || isNaN(val)) return err(resp, 400, "Not a valid bookmark");
       if (val > bookmark || u.query.hasOwnProperty("force")) setBookmark(val);
       resp.writeHead(204, {});
       resp.end();

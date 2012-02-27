@@ -171,9 +171,9 @@ function fetchData() {
     if (output.firstChild) getBookmark(function(bookmark) {
       var btime = Number(bookmark);
       for (var cur = output.firstChild; cur; cur = cur.nextSibling)
-        if (Number(cur.getAttribute("data-time")) >= btime) break;
+        if (timeFor(cur.logLine) >= btime) break;
       $("input").focus();
-      window.scrollTo(0, maxScroll = (cur || output.lastSibling).offsetTop - 10);
+      window.scrollTo(0, maxScroll = (cur || output.lastChild).offsetTop - 10);
     }, function() {$("input").focus();});
     getNames(function(names) {
       curState.names = {};
@@ -229,38 +229,38 @@ function getColor(name) {
   return col;
 }
 
-var scratchDIV = document.createElement("div");
+var scratchDiv = document.createElement("div");
 function htmlEsc(s) {
-  scratchDIV.textContent = s;
-  return scratchDIV.innerHTML;
+  scratchDiv.textContent = s;
+  return scratchDiv.innerHTML;
 }
 
-var curState = {prevName: null, names: {}};
+var curState = {prevName: null, names: {}, unread: []};
 
 function processLine(state, line) {
-  var type = line.charAt(11), html = "";
+  var type = line.charAt(11);
   var col = line.indexOf(":", 13);
   if (col > -1) var name = line.slice(13, col), msg = line.slice(col + 2);
   else var msg = line.slice(13);
 
   if (type == "_" || type == ">" || (type == "n" && name)) {
     var newName = state.prevName != name;
-    html += "<div style=\"border-left: 2px solid " + getColor(name) +
-      (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") +
-      " data-time=" + line.slice(0, 10) + ">";
+    var html = "<div style=\"border-left: 2px solid " + getColor(name) +
+      (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") + ">";
     if (newName) {
       state.prevName = name;
       html += "<div class=name>" + htmlEsc(name) + "</div>";
     }
     var act = msg.match(/^\01ACTION (.*)\01$/);
-    if (act) html += "<em>" + htmlEsc(act[1]) + "</em></div>"
-    else  html += htmlEsc(msg) + "</div>"
+    var msgHTML = act ? "<em>" + htmlEsc(act[1]) + "</em>" : htmlEsc(msg);
+    var direct = msgHTML.indexOf(nick) > -1;
+    if (direct) msgHTML = msgHTML.replace(nick, "<span class=mention>" + nick + "</span>");
+    html += msgHTML + "</div>";
   } else if (type == "<") {
     state.lastDirect = name;
-    var newName = state.prevName != "to " + name;
-    html += "<div style=\"border-left: 2px solid " + selfColor +
-      (newName ? "; margin-top: 1px" : "") + "\" class=priv" +
-      " data-time=" + line.slice(0, 10) + ">";
+    var newName = state.prevName != "to " + name, direct = true;
+    var html = "<div style=\"border-left: 2px solid " + selfColor +
+      (newName ? "; margin-top: 1px" : "") + "\" class=priv>";
     if (newName) {
       state.prevName = "to " + name;
       html += "<div class=name>⇝" + htmlEsc(name) + "</div>";
@@ -274,16 +274,22 @@ function processLine(state, line) {
     state.names[name] = false;
     state.names[msg] = true;
   }
-  return html;
+  if (html) {
+    scratchDiv.innerHTML = html;
+    var node = scratchDiv.firstChild;
+    node.logLine = line;
+    if (direct) state.unread.push(node);
+    return node;
+  }
 }
 
-var unseenMessages = [];
-
 function repaint() {
-  var html = "";
-  for (var i = 0, e = knownHistory.length; i < e; ++i)
-    html += processLine(curState, knownHistory[i]);
-  $("output").innerHTML = html;
+  var output = $("output");
+  output.innerHTML = "";
+  for (var i = 0, e = knownHistory.length; i < e; ++i) {
+    var node = processLine(curState, knownHistory[i]);
+    if (node) output.appendChild(node);
+  }
 }
 
 function scrollTop() {
@@ -315,7 +321,7 @@ function timeAtScrollPos(at) {
       else lo = mid;
     }
   }
-  return Number(node.getAttribute("data-time"));
+  return timeFor(node.logLine);
 }
 var maxScroll = 0, sendingScroll = false;
 function scrolled() {
@@ -326,7 +332,6 @@ function scrolled() {
       sendingScroll = true;
       setTimeout(function send() {
         var time = timeAtScrollPos(maxScroll);
-        console.log(time);
         setBookmark(time, function() {sendingScroll = false;}, function() {
           setTimeout(send, 10000);
         });
@@ -341,13 +346,12 @@ function addLines(lines) {
   lines = lines.split("\n");
   lines.pop();
   knownUpto = timeFor(lines[lines.length - 1]);
-  var html = "", output = $("output");
+  var output = $("output");
   for (var i = 0; i < lines.length; ++i) {
-    html += processLine(curState, lines[i]);
+    var node = processLine(curState, lines[i]);
+    if (node) output.appendChild(node);
     knownHistory.push(lines[i]);
   }
-  scratchDIV.innerHTML = html;
-  while (scratchDIV.firstChild) output.appendChild(scratchDIV.firstChild);
   if (atBottom && winFocused) window.scrollTo(0, document.body.scrollHeight);
 }
 

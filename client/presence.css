@@ -28,6 +28,11 @@ div.name {
   z-index: 5;
 }
 
+span.direct {
+  color: #34c2c9;
+  font-weight: bold;
+}
+
 textarea#input {
   border: none;
   border-left: 2px solid #34c2c9;
