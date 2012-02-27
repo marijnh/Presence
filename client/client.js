@@ -158,41 +158,43 @@ function getWhoIs(name, c, err) {
 function getBookmark(c, err) {
   httpRequest(document.location.href + "bookmark", {}, c, err);
 }
-function setBookmark(val, c, err) {
-  httpRequest(document.location.href + "bookmark", {method: "PUT", body: String(val)}, c, err);
+function setBookmark(val, force, c, err) {
+  httpRequest(document.location.href + "bookmark" + (force ? "?force" : ""),
+              {method: "PUT", body: String(val)}, c, err);
 }
 
 var knownHistory = [], knownUpto, knownFrom;
 
 function fetchData() {
-  var yesterday = knownFrom = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
-  getHistory(yesterday, null, null, function(history) {
-    knownHistory = history.split("\n");
-    knownHistory.pop();
-    if (knownHistory.length)
-      knownUpto = timeFor(knownHistory[knownHistory.length - 1]);
-    repaint();
+  var yesterday = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
+  function failed(msg) {
+    document.body.innerHTML = "Failed to connect to Presence server (" + msg + ")";
+  }
+  getBookmark(function(bookmark) {
+    var btime = Number(bookmark), from = Math.min(yesterday, btime);
+    getHistory(from || 1, null, null, function(history) {
+      knownHistory = history.split("\n");
+      knownHistory.pop();
+      if (knownHistory.length)
+        knownUpto = timeFor(knownHistory[knownHistory.length - 1]);
+      else knownUpto = from;
+      knownFrom = from;
+      repaint();
 
-    function done() {
+      if (output.firstChild) 
+        for (var cur = output.firstChild; cur; cur = cur.nextSibling)
+          if (timeFor(cur.logLine) >= btime) break;
       input.focus();
       connect(window, "scroll", scrolled);
-    }
-    if (output.firstChild) getBookmark(function(bookmark) {
-      var btime = Number(bookmark);
-      for (var cur = output.firstChild; cur; cur = cur.nextSibling)
-        if (timeFor(cur.logLine) >= btime) break;
-      done();
       window.scrollTo(0, maxScroll = (cur || output.lastChild).offsetTop - 10);
-    }, done);
 
-    getNames(function(names) {
-      curState.names = {};
-      forEach(names.split(" "), function(name) {curState.names[name] = true;});
-      poll();
-    }, function() {poll();});
-  }, function(msg) {
-    document.body.innerHTML = "Failed to connect to Presence server (" + msg + ")";
-  });
+      getNames(function(names) {
+        curState.names = {};
+        forEach(names.split(" "), function(name) {curState.names[name] = true;});
+        poll();
+      }, function() {poll();});
+    }, failed);
+  }, failed);
 }
 
 function loadMore() {
@@ -382,7 +384,7 @@ function scrolled() {
       sendingScroll = true;
       setTimeout(function send() {
         var time = timeAtScrollPos(maxScroll);
-        setBookmark(time, function() {sendingScroll = false;}, function() {
+        setBookmark(time, false, function() {sendingScroll = false;}, function() {
           setTimeout(send, 10000);
         });
       }, 1000);
