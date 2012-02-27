@@ -27,7 +27,7 @@ for (var i = 5; i < process.argv.length; ++i) {
   } else help();
 }
 
-var logFile = "log_" + server + "_" + channel.slice(1) + ".txt";
+var logFile = "log_" + channel.slice(1) + ".txt", bookmarkFile = "bookmark_" + channel.slice(1) + ".txt";
 
 var output = fs.createWriteStream(logFile, {flags: "a"});
 
@@ -98,7 +98,20 @@ function timeAt(str, pos) {
 }
 
 var recentActivity = [], recentActivityStart = time();
-var maxActivityLen = 2000;
+var maxActivityLen = 200;
+
+var bookmark = 0, savingBookmark = false;
+fs.readFile(bookmarkFile, function(err, bm) { if (!err) bookmark = Number(bm); });
+function setBookmark(val) {
+  bookmark = val;
+  if (!savingBookmark) {
+    savingBookmark = true;
+    setTimeout(function() {
+      savingBookmark = false;
+      fs.writeFile(bookmarkFile, String(bookmark));
+    }, 5000);
+  }
+}
 
 function logLine(tag, str) {
   var line = time() + " " + tag + " " + str + "\n";
@@ -304,6 +317,16 @@ http.createServer(function(req, resp) {
       }
       if (history || to) sendText(resp, history);
       else addWaiting("history", resp);
+    });
+  } else if (req.method == "GET" && path == "bookmark") {
+    sendText(resp, String(bookmark));
+  } else if (req.method == "PUT" && path == "bookmark") {
+    getData(req, function(body) {
+      var val = Number(body);
+      if (!val || isNaN(val)) return err("Not a valid bookmark");
+      if (val > bookmark || u.query.hasOwnProperty("force")) setBookmark(val);
+      resp.writeHead(204, {});
+      resp.end();
     });
   } else if (req.method == "GET" && clientFile.hasOwnProperty(path)) {
     var info = clientFile[path];

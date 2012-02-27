@@ -26,7 +26,6 @@ window.onload = function() {
       } else {
         var cur = input.selectionStart, start = cur;
         while (start && /\w/.test(val.charAt(start - 1))) --start;
-        console.log(cur, start, val);
         var completions = [], frag = val.slice(start, cur);
         if (start && val.charAt(start - 1) == "/") {
           --start;
@@ -34,15 +33,16 @@ window.onload = function() {
             if (key.slice(0, frag.length) == frag) completions.push("/" + key);
           });
         } else {
+          var appendCol = start ? "" : ":";
           forEachIn(curState.names, function(key) {
-            if (key.slice(0, frag.length) == frag) completions.push(key + ":");
+            if (key.slice(0, frag.length) == frag) completions.push(key + appendCol);
           });
         }
         if (completions.length == 1) {
           complete(start, completions[0]);
         } else if (completions.length > 1) {
           var html = "<div class=completions data-start=" + start + ">";
-          forEach(completions, function(c) { console.log(c); html += "<div>" + htmlEsc(c) + "</div>"; })
+          forEach(completions, function(c) { html += "<div>" + htmlEsc(c) + "</div>"; })
           setStatus(html + "</div>", true);
         }
       }
@@ -55,6 +55,9 @@ window.onload = function() {
     else if (e.target.parentNode.className == "completions")
       complete(Number(e.target.parentNode.getAttribute("data-start")), e.target.innerText);
   });
+  connect(window, "scroll", scrolled);
+  connect(window, "focus", function() { winFocused = true; })
+  connect(window, "blur", function() { winFocused = false; })
   fetchData();
 };
 
@@ -81,7 +84,8 @@ var commands = {
     });
     setStatus(html + "</div>");
   }
-}
+};
+var winFocused = true;
 
 function whoIs(name) {
   startSend();
@@ -146,6 +150,13 @@ function getWhoIs(name, c, err) {
   httpRequest(document.location.href + "whois/" + encodeURIComponent(name), {}, c, err);
 }
 
+function getBookmark(c, err) {
+  httpRequest(document.location.href + "bookmark", {}, c, err);
+}
+function setBookmark(val, c, err) {
+  httpRequest(document.location.href + "bookmark", {method: "PUT", body: String(val)}, c, err);
+}
+
 var knownHistory = [], knownUpto;
 
 function fetchData() {
@@ -156,6 +167,13 @@ function fetchData() {
     if (knownHistory.length)
       knownUpto = timeFor(knownHistory[knownHistory.length - 1]);
     repaint();
+    if (knownHistory.length) getBookmark(function(bookmark) {
+      var btime = Number(bookmark), output = $("output");
+      for (var cur = output.firstChild; cur; cur = cur.nextSibling)
+        if (Number(cur.getAttribute("data-time")) >= btime) break;
+      $("input").focus();
+      window.scrollTo(0, maxScroll = (cur || output.lastSibling).offsetTop - 10);
+    }, function() {});
     getNames(function(names) {
       curState.names = {};
       forEach(names.split(" "), function(name) {curState.names[name] = true;});
@@ -173,7 +191,7 @@ function setStatus(html, closeOnInput) {
   $("status").innerHTML = html;
   $("statuswrap").style.height = $("status").offsetHeight + "px";
   if (atBottom && html) var tick = 0, scroll = setInterval(function() {
-    document.body.scrollTop = document.body.scrollHeight;
+    window.scrollTo(0, document.body.scrollHeight);
     if (++tick == 11) clearInterval(scroll);
   }, 100);
 }
@@ -189,7 +207,7 @@ function buildColor(hue, sat, light) {
   return "#" + hex(0) + hex(.33) + hex(.67);
 }
 
-var colors = {}, selfColor = "silver";
+var colors = {}, selfColor = "#34c2c9";
 function getColor(name) {
   if (name == nick) return selfColor;
   var cached = colors[name];
@@ -227,7 +245,8 @@ function processLine(state, line) {
   if (type == "_" || type == ">" || (type == "n" && name)) {
     var newName = state.prevName != name;
     html += "<div style=\"border-left: 2px solid " + getColor(name) +
-      (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") + ">";
+      (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") +
+      " data-time=" + line.slice(0, 10) + ">";
     if (newName) {
       state.prevName = name;
       html += "<div class=name>" + htmlEsc(name) + "</div>";
@@ -239,7 +258,8 @@ function processLine(state, line) {
     state.lastDirect = name;
     var newName = state.prevName != "to " + name;
     html += "<div style=\"border-left: 2px solid " + selfColor +
-      (newName ? "; margin-top: 1px" : "") + "\" class=priv>";
+      (newName ? "; margin-top: 1px" : "") + "\" class=priv" +
+      " data-time=" + line.slice(0, 10) + ">";
     if (newName) {
       state.prevName = "to " + name;
       html += "<div class=name>⇝" + htmlEsc(name) + "</div>";
@@ -263,11 +283,53 @@ function repaint() {
   $("output").innerHTML = html;
 }
 
+function scrollTop() {
+  return window.pageYOffset || document.body.scrollTop || document.documentElement.scrollTop;
+}
+function winHeight() {
+  return window.innerHeight || document.documentElement.clientHeight;
+}
+function bodyHeight() {
+  return Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+}
 function isScrolledToBottom() {
-  var scrolled = window.pageYOffset || document.body.scrollTop || document.documentElement.scrollTop;
-  var winHeight = window.innerHeight || document.documentElement.clientHeight;
-  var bodyHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-  return scrolled + winHeight >= bodyHeight - 2;
+  return scrollTop() + winHeight() >= bodyHeight() - 2;
+}
+
+function timeAtScrollPos(at) {
+  var output = $("output"), lo = 0, hi = output.childNodes.length;
+  var node = output.firstChild, pos = at + 12;
+  if (!node) return 0;
+  if (pos >= output.offsetTop + output.offsetHeight) {
+    node = output.lastChild;
+  } else if (pos > output.offsetTop) {
+    while (true) {
+      var mid = (lo + hi) >> 1;
+      node = output.childNodes[mid];
+      var top = node.offsetTop, bot = top + node.offsetHeight;
+      if (top > pos) hi = mid;
+      else if (bot >= pos) break;
+      else lo = mid;
+    }
+  }
+  return Number(node.getAttribute("data-time"));
+}
+var maxScroll = 0, sendingScroll = false;
+function scrolled() {
+  var scroll = scrollTop();
+  if (scroll > maxScroll + 50) {
+    maxScroll = scroll;
+    if (!sendingScroll) {
+      sendingScroll = true;
+      setTimeout(function send() {
+        var time = timeAtScrollPos(maxScroll);
+        console.log(time);
+        setBookmark(time, function() {sendingScroll = false;}, function() {
+          setTimeout(send, 10000);
+        });
+      }, 1000);
+    }
+  }
 }
 
 function addLines(lines) {
@@ -283,7 +345,7 @@ function addLines(lines) {
   }
   scratchDIV.innerHTML = html;
   while (scratchDIV.firstChild) output.appendChild(scratchDIV.firstChild);
-  if (atBottom) document.body.scrollTop = document.body.scrollHeight;
+  if (atBottom && winFocused) window.scrollTo(0, document.body.scrollHeight);
 }
 
 function poll(backOff) {
