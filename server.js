@@ -1,12 +1,15 @@
 #!/usr/local/bin/node
 
-var irc = require("irc"),
-    fs = require('fs'),
-    http = require("http"),
-    url = require("url");
+var irc = require("irc"), fs = require("fs"), http = require("http"), url = require("url");
 
+var arg1Parts = process.argv[1].split("/");
+var scriptName = arg1Parts.pop();
+var myPath = (arg1Parts.join("/") || ".") + "/";
 function help() {
-  console.log("usage: " + process.argv[1] + " <server> <nick> <channel> [--port <http port>]");
+  console.log("usage: " + arg1Parts[arg1Parts.length-1] + " <server> <nick> <channel>\n" +
+              "         [--port <http port>]\n" +
+              "         [--realname <name>]\n" +
+              "         [--outputdir <dir>]");
   process.exit(1);
 }
 
@@ -16,18 +19,26 @@ var server = process.argv[2];
 var nick = process.argv[3];
 var channel = "#" + process.argv[4];
 var port = 8080;
+var realName = "Presence bot";
+var outputDir = "./";
 
 var debug = true;
 var timeWidth = 10;
 
 for (var i = 5; i < process.argv.length; ++i) {
-  var arg = process.argv[i];
-  if (arg == "--port" && i + 1 < process.argv.length) {
+  var arg = process.argv[i], more = i + 1 < process.argv.length;
+  if (arg == "--port" && more) {
     port = Number(process.argv[++i]);
+  } else if (arg == "--realname" && more) {
+    realName = process.argv[++i];
+  } else if (arg == "--outputdir" && more) {
+    outputDir = process.argv[++i];
+    if (outputDir.charAt(outputDir.length - 1) != "/") outputDir += "/";
   } else help();
 }
 
-var logFile = "log_" + channel.slice(1) + ".txt", bookmarkFile = "bookmark_" + channel.slice(1) + ".txt";
+var logFile = outputDir + "log_" + channel.slice(1) + ".txt",
+    bookmarkFile = outputDir + "bookmark_" + channel.slice(1) + ".txt";
 
 var output = fs.createWriteStream(logFile, {flags: "a"});
 
@@ -35,7 +46,7 @@ var ircClient, ircClientOK = false;
 function openIRC(backoff) {
   console.log("Connecting to " + server);
   var client = ircClient = new irc.Client(server, nick, {
-    realName: "Presence bot",
+    realName: realName,
     channels: [channel]
   });
 
@@ -236,9 +247,9 @@ function getData(obj, c) {
 }
 
 var clientFile = {}, mimes = {"html": "text/html", "js": "application/javascript", "css": "text/css"};
-fs.readdirSync("client").forEach(function(file) {
+fs.readdirSync(myPath + "client").forEach(function(file) {
   clientFile[file] = {mime: mimes[file.split(".").pop()] || "text/plain",
-                      data: fs.readFileSync("client/" + file, "utf8")};
+                      data: fs.readFileSync(myPath + "client/" + file, "utf8")};
 });
 
 function htmlEsc(text) {
@@ -331,7 +342,7 @@ http.createServer(function(req, resp) {
   } else if (req.method == "GET" && clientFile.hasOwnProperty(path)) {
     var info = clientFile[path];
     resp.writeHead(200, {"Content-Type": info.mime});
-    resp.write(debug ? fs.readFileSync("client/" + path) : info.data);
+    resp.write(debug ? fs.readFileSync(myPath + "client/" + path) : info.data);
     resp.end();
   } else {
     err(resp, 404, "Not found", u.pathname + " does not support " + req.method + " requests");

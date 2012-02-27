@@ -161,19 +161,20 @@ var knownHistory = [], knownUpto;
 
 function fetchData() {
   var start = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
+  var output = $("output");
   getHistory(start, null, null, function(history) {
     knownHistory = history.split("\n");
     knownHistory.pop();
     if (knownHistory.length)
       knownUpto = timeFor(knownHistory[knownHistory.length - 1]);
     repaint();
-    if (knownHistory.length) getBookmark(function(bookmark) {
-      var btime = Number(bookmark), output = $("output");
+    if (output.firstChild) getBookmark(function(bookmark) {
+      var btime = Number(bookmark);
       for (var cur = output.firstChild; cur; cur = cur.nextSibling)
         if (Number(cur.getAttribute("data-time")) >= btime) break;
       $("input").focus();
       window.scrollTo(0, maxScroll = (cur || output.lastSibling).offsetTop - 10);
-    }, function() {});
+    }, function() {$("input").focus();});
     getNames(function(names) {
       curState.names = {};
       forEach(names.split(" "), function(name) {curState.names[name] = true;});
@@ -275,6 +276,8 @@ function processLine(state, line) {
   }
   return html;
 }
+
+var unseenMessages = [];
 
 function repaint() {
   var html = "";
