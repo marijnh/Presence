@@ -281,7 +281,7 @@ http.createServer(function(req, resp) {
   var path = u.pathname.slice(1);
   if (req.method == "GET" && path == "") {
     resp.writeHead(200, {"Content-Type": "text/html"});
-    resp.write(instantiate("index.html", {nick: nick, chan: channel, server: server}));
+    resp.write(instantiate("index.html", {nick: nick, chan: channel}));
     resp.end();
   } else if (req.method == "POST" && (m = path.match(/^send\/([^\/]+)(?:\/(.*))?$/))) {
     if (!ircClientOK) return err(resp, 500, "No IRC connection");

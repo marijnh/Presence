@@ -68,127 +68,16 @@ var Util = {
     }
     return result;
   },
-  findIf: function findIf(pred, collection) {
-    var l = collection.length;
-    for (var i = 0; i < l; ++i) {
-      var cur = collection[i];
-      if (pred(cur)) return cur;
-    }
-  },
-  some: function some(pred, collection) {
-    var l = collection.length;
-    for (var i = 0; i < l; ++i)
-      if (pred(collection[i])) return true;
-    return false;
-  },
-  every: function every(pred, collection) {
-    var l = collection.length;
-    for (var i = 0; i < l; ++i)
-      if (!pred(collection[i])) return false;
-    return true;
-  },
-  member: function member(value, collection) {
-    return some(function(x){return x == value;}, collection);
-  },
-  remove: function remove(value, collection) {
-    var result = [], l = collection.length;
-    for (var i = 0; i < l; ++i)
-      if (collection[i] != value) result.push(collection[i]);
-    return result;
-  },
   forEachIn: function forEachIn(object, action) {
     for (var property in object) {
       if (Object.prototype.hasOwnProperty.call(object, property))
         action(property, object[property]);
     }
   },
-  characters: function characters(string) {
-    if (string.length == 0 || string[1]) return string;
-    var result = new String(string), l = string.length;
-    for (var i = 0; i < l; ++i)
-      result[i] = string.charAt(i);
-    return result;
-  },
-
-  // Functional
-  partial: function partial(func) {
-    var fixedArgs = [];
-    for (var i = 1; i < arguments.length; ++i)
-      fixedArgs.push(arguments[i]);
-    return function() {
-      var args = fixedArgs.concat([]);
-      for (var i = 0; i < arguments.length; ++i)
-        args.push(arguments[i]);
-      return func.apply(null, args);
-    };
-  },
-  method: function method(obj, name) {
-    return function() {obj[name].apply(obj, arguments);};
-  },
-  ident: function(x) {
-    return x;
-  },
 
   // Objects
-  clone: function clone(object) {
-    function Dummy(){}
-    Dummy.prototype = object;
-    return new Dummy();
-  },
   fill: function fill(dest, source) {
     Util.forEachIn(source, function(name, val) {dest[name] = val;});
-  },
-  defaultTo: function defaultTo(dest, source) {
-    Util.forEachIn(source, function(name, val) {
-      if (!dest.hasOwnProperty(name)) dest[name] = val;
-    });
-  },
-  getter: function getter(prop) {
-    return function(obj) {return obj[prop];};
-  },
-  Prototype: {
-    extend: function extend(properties) {
-      var object = Util.clone(this);
-      if (properties) Util.fill(object, properties);
-      return object;
-    },
-    create: function create() {
-      var instance = Util.clone(this);
-      if (typeof instance.construct == "function")
-        instance.construct.apply(instance, arguments);
-      return instance;
-    }
-  },
-
-  // DOM
-  $: function(name) {
-    return document.getElementById(name);
-  },
-  removeNode: function removeNode(node) {
-    if (node.parentNode)
-      node.parentNode.removeChild(node);
-  },
-  isInDocument: function isInDocument(node, doc) {
-    doc = doc || document;
-    for (var cur = node; cur && cur != doc.body; cur = cur.parentNode);
-    return cur == doc.body;
-  },
-  selectValue: function selectValue(node) {
-    var opt = node.options[node.selectedIndex];
-    return opt && opt.value;
-  },
-  totalOffset: function totalOffset(node) {
-    var x = 0, y = 0;
-    while (node) {
-      x += node.offsetLeft; y += node.offsetTop;
-      node = node.offsetParent;
-    }
-    return {x: x, y: y};
-  },
-
-  // Time
-  time: function() {
-    return new Date().getTime();
   },
 
   // XHR
@@ -340,28 +229,4 @@ var Util = {
   }
 };
 
-// Dictionary
-Util.Dictionary = Util.Prototype.extend({
-  construct: function construct(startValues) {
-    this.values = startValues || {};
-  },
-  store: function store(name, value) {
-    this.values[name] = value;
-  },
-  remove: function remove(name) {
-    delete this.values[name];
-  },
-  lookup: function lookup(name) {
-    return this.values[name];
-  },
-  contains: function contains(name) {
-    return Object.prototype.propertyIsEnumerable.call(this.values, name);
-  },
-  each: function each(action) {
-    Util.forEachIn(this.values, action);
-  },
-  clear: function clear(values) {
-    this.values = values || {};
-  }
-});
 Util.fill(window, Util);

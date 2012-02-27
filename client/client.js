@@ -1,6 +1,10 @@
+var input, output;
+
 // Initialization
 window.onload = function() {
-  var input = $("input");
+  input = document.getElementById("input");
+  output = document.getElementById("output");
+
   connect(input, "keydown", function(e) {
     if (closeStatusOnInput) setStatus("");
     if (e.keyCode == 13 && !e.shiftKey) {
@@ -48,7 +52,7 @@ window.onload = function() {
       }
     }
   });
-  connect($("statusclose"), "click", function(e) {setStatus("");});
+  connect(document.getElementById("statusclose"), "click", function(e) {setStatus("");});
   connect(document.body, "click", function(e) {
     if (e.target.parentNode.className == "names") whoIs(e.target.innerText);
     else if (e.target.className == "name") whoIs(e.target.innerText);
@@ -62,7 +66,7 @@ window.onload = function() {
 };
 
 function complete(start, text) {
-  var input = $("input"), end = input.selectionStart, val = input.value;
+  var input = input, end = input.selectionStart, val = input.value;
   input.value = val.slice(0, start) + text + " " + val.slice(end);
   var cur = start + text.length + 1;
   input.setSelectionRange(cur, cur);
@@ -114,12 +118,12 @@ function timeFor(str) {
 
 var sendDepth = 0;
 function startSend() {
-  if (!sendDepth) $("input").style.background = "#eee";
+  if (!sendDepth) input.style.background = "#eee";
   sendDepth++;
 }
 function stopSend() {
   sendDepth--;
-  if (!sendDepth) $("input").style.background = "";
+  if (!sendDepth) input.style.background = "";
 }
 
 // API wrappers
@@ -161,7 +165,6 @@ var knownHistory = [], knownUpto;
 
 function fetchData() {
   var start = Math.floor((new Date).getTime() / 1000) - 3600 * 24;
-  var output = $("output");
   getHistory(start, null, null, function(history) {
     knownHistory = history.split("\n");
     knownHistory.pop();
@@ -172,9 +175,9 @@ function fetchData() {
       var btime = Number(bookmark);
       for (var cur = output.firstChild; cur; cur = cur.nextSibling)
         if (timeFor(cur.logLine) >= btime) break;
-      $("input").focus();
+      input.focus();
       window.scrollTo(0, maxScroll = (cur || output.lastChild).offsetTop - 10);
-    }, function() {$("input").focus();});
+    }, function() {input.focus();});
     getNames(function(names) {
       curState.names = {};
       forEach(names.split(" "), function(name) {curState.names[name] = true;});
@@ -187,10 +190,10 @@ function fetchData() {
 
 var closeStatusOnInput = false;
 function setStatus(html, closeOnInput) {
-  var atBottom = isScrolledToBottom();
+  var atBottom = isScrolledToBottom(), status = document.getElementById("status");
   closeStatusOnInput = closeOnInput;
-  $("status").innerHTML = html;
-  $("statuswrap").style.height = $("status").offsetHeight + "px";
+  status.innerHTML = html;
+  document.getElementById("statuswrap").style.height = status.offsetHeight + "px";
   if (atBottom && html) var tick = 0, scroll = setInterval(function() {
     window.scrollTo(0, document.body.scrollHeight);
     if (++tick == 11) clearInterval(scroll);
@@ -284,7 +287,6 @@ function processLine(state, line) {
 }
 
 function repaint() {
-  var output = $("output");
   output.innerHTML = "";
   for (var i = 0, e = knownHistory.length; i < e; ++i) {
     var node = processLine(curState, knownHistory[i]);
@@ -306,7 +308,7 @@ function isScrolledToBottom() {
 }
 
 function timeAtScrollPos(at) {
-  var output = $("output"), lo = 0, hi = output.childNodes.length;
+  var lo = 0, hi = output.childNodes.length;
   var node = output.firstChild, pos = at + 12;
   if (!node) return 0;
   if (pos >= output.offsetTop + output.offsetHeight) {
@@ -346,7 +348,6 @@ function addLines(lines) {
   lines = lines.split("\n");
   lines.pop();
   knownUpto = timeFor(lines[lines.length - 1]);
-  var output = $("output");
   for (var i = 0; i < lines.length; ++i) {
     var node = processLine(curState, lines[i]);
     if (node) output.appendChild(node);
