@@ -7,6 +7,7 @@ window.onload = function() {
 
   connect(input, "keydown", function(e) {
     if (closeStatusOnInput) setStatus("");
+    if (curState.unread.length) { curState.unread = []; updateTitle(); }
     if (e.keyCode == 13 && !e.shiftKey) {
       var val = input.value;
       if (!val) return;
@@ -59,7 +60,6 @@ window.onload = function() {
     else if (e.target.parentNode.className == "completions")
       complete(Number(e.target.parentNode.getAttribute("data-start")), e.target.innerText);
   });
-  connect(window, "scroll", scrolled);
   connect(window, "focus", function() { winFocused = true; })
   connect(window, "blur", function() { winFocused = false; })
   fetchData();
@@ -171,13 +171,19 @@ function fetchData() {
     if (knownHistory.length)
       knownUpto = timeFor(knownHistory[knownHistory.length - 1]);
     repaint();
+
+    function done() {
+      input.focus();
+      connect(window, "scroll", scrolled);
+    }
     if (output.firstChild) getBookmark(function(bookmark) {
       var btime = Number(bookmark);
       for (var cur = output.firstChild; cur; cur = cur.nextSibling)
         if (timeFor(cur.logLine) >= btime) break;
-      input.focus();
+      done();
       window.scrollTo(0, maxScroll = (cur || output.lastChild).offsetTop - 10);
-    }, function() {input.focus();});
+    }, done);
+
     getNames(function(names) {
       curState.names = {};
       forEach(names.split(" "), function(name) {curState.names[name] = true;});
@@ -258,10 +264,11 @@ function processLine(state, line) {
     var msgHTML = act ? "<em>" + htmlEsc(act[1]) + "</em>" : htmlEsc(msg);
     var direct = msgHTML.indexOf(nick) > -1;
     if (direct) msgHTML = msgHTML.replace(nick, "<span class=mention>" + nick + "</span>");
+    if (type == ">") direct = true;
     html += msgHTML + "</div>";
   } else if (type == "<") {
     state.lastDirect = name;
-    var newName = state.prevName != "to " + name, direct = true;
+    var newName = state.prevName != "to " + name;
     var html = "<div style=\"border-left: 2px solid " + selfColor +
       (newName ? "; margin-top: 1px" : "") + "\" class=priv>";
     if (newName) {
@@ -281,7 +288,10 @@ function processLine(state, line) {
     scratchDiv.innerHTML = html;
     var node = scratchDiv.firstChild;
     node.logLine = line;
-    if (direct) state.unread.push(node);
+    if (direct) {
+      state.unread.push(node);
+      if (state == curState) updateTitle();
+    }
     return node;
   }
 }
@@ -292,6 +302,11 @@ function repaint() {
     var node = processLine(curState, knownHistory[i]);
     if (node) output.appendChild(node);
   }
+}
+
+function updateTitle() {
+  var msgs = curState.unread.length;
+  document.title = channel + (msgs ? " (" + msgs + ")" : "");
 }
 
 function scrollTop() {
@@ -328,6 +343,15 @@ function timeAtScrollPos(at) {
 var maxScroll = 0, sendingScroll = false;
 function scrolled() {
   var scroll = scrollTop();
+  // Clear seen messages from unread list
+  var endVis = scroll + winHeight() - 12;
+  while (curState.unread.length) {
+    var msg = curState.unread[0];
+    if (msg.offsetTop + msg.offsetHeight < endVis) {
+      curState.unread.shift();
+      updateTitle();
+    } else break;
+  }
   if (scroll > maxScroll + 50) {
     maxScroll = scroll;
     if (!sendingScroll) {
