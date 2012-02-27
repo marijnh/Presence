@@ -80,7 +80,7 @@ window.onload = function() {
 };
 
 function complete(start, text) {
-  var input = input, end = input.selectionStart, val = input.value;
+  var end = input.selectionStart, val = input.value;
   input.value = val.slice(0, start) + text + " " + val.slice(end);
   var cur = start + text.length + 1;
   input.setSelectionRange(cur, cur);
@@ -296,7 +296,7 @@ function processLine(state, line) {
   if (col > -1) var name = line.slice(13, col), msg = line.slice(col + 2);
   else var msg = line.slice(13);
 
-  if (type == "_" || type == ">" || (type == "n" && name)) {
+  if (type == "_" || type == ">") {
     var newName = state.prevName != name;
     var html = "<div style=\"border-left: 2px solid " + getColor(name) +
       (newName ? "; margin-top: 1px" : "") + "\"" + (type == ">" ? " class=priv" : "") + ">";

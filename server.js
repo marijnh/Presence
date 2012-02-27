@@ -9,6 +9,7 @@ function help() {
   console.log("usage: " + arg1Parts[arg1Parts.length-1] + " <server> <nick> <channel>\n" +
               "         [--port <http port>]\n" +
               "         [--realname <name>]\n" +
+              "         [--password <pass>]\n" +
               "         [--outputdir <dir>]");
   process.exit(1);
 }
@@ -21,6 +22,7 @@ var channel = "#" + process.argv[4];
 var port = 8080;
 var realName = "Presence bot";
 var outputDir = "./";
+var password = null;
 
 var debug = true;
 var timeWidth = 10;
@@ -31,6 +33,8 @@ for (var i = 5; i < process.argv.length; ++i) {
     port = Number(process.argv[++i]);
   } else if (arg == "--realname" && more) {
     realName = process.argv[++i];
+  } else if (arg == "--password" && more) {
+    password = process.argv[++i];
   } else if (arg == "--outputdir" && more) {
     outputDir = process.argv[++i];
     if (outputDir.charAt(outputDir.length - 1) != "/") outputDir += "/";
@@ -55,6 +59,8 @@ function openIRC(backoff) {
     backoff = 1;
     console.log("Connected to " + server + (message ? ": " + message : ""));
     ircClientOK = true;
+    if (password != null)
+      ircClient.send("PRIVMSG", "NickServ", "IDENTIFY " + password);
   });
   client.addListener("pm", function(from, text) {
     logLine(">", from + ": " + text);
