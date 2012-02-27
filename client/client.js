@@ -2,19 +2,68 @@
 window.onload = function() {
   var input = $("input");
   connect(input, "keypress", function(e) {
+    if (closeStatusOnInput) setStatus("");
     if (e.keyCode == 13 && !e.shiftKey) {
       var val = input.value;
       if (!val) return;
       input.value = "";
-      forEach(val.split(/\r?\n/g), function(line) {
-        startSend();
-        sendCommand("PRIVMSG", ["#" + channel], line, stopSend);
-      });
+      var cmd = val.match(/^\/(\w+)\b\s*(.*)$/);
+      if (cmd && commands.hasOwnProperty(cmd[1])) {
+        commands[cmd[1]](cmd[2]);
+      } else {
+        forEach(val.split(/\r?\n/g), function(line) {
+          sendCommand("PRIVMSG", ["#" + channel], line);
+        });
+      }
       e.preventDefault();
     }
   });
+  connect($("statusclose"), "click", function(e) {setStatus("");});
+  connect(document.body, "click", function(e) {
+    if (e.target.parentNode.className == "names") whoIs(e.target.innerText);
+    else if (e.target.className == "name") whoIs(e.target.innerText);
+  });
   fetchData();
 };
+
+var commands = {
+  "msg": function(line) {
+    var m = line.match(/^\s*(\S+)\s+(.+)$/);
+    if (m) sendCommand("PRIVMSG", [m[1]], m[2]);
+  },
+  "me": function(line) {
+    sendCommand("PRIVMSG", ["#" + channel], "\01ACTION " + line + "\01");
+  },
+  "whois": whoIs,
+  "names": function() {
+    var html = "<div class=names>";
+    forEachIn(curState.names, function(name, present) {
+      if (present) html += "<div>" + htmlEsc(name) + "</div>";
+    });
+    setStatus(html + "</div>");
+  }
+}
+
+function whoIs(name) {
+  startSend();
+  getWhoIs(name.match(/^\s*(.*?)\s*$/)[1], function(info) {
+    var nm = htmlEsc(name);
+    stopSend();
+    if (info == "") return setStatus("<strong>No such nick: " + nm + "</strong>");
+    info = JSON.parse(info);
+    var html = "";
+    if (info.realname) html += nm + " is " + htmlEsc(info.realname) + "<br>";
+    if (info.channels && info.channels.length)
+      html += nm + " is on channels " + htmlEsc(info.channels.map(function (s) {
+        return s.replace(/@/g, ""); }).join(", ")) + "<br>";
+    if (info.host) html += "host: " + htmlEsc(info.host) + "<br>";
+    if (info.server) html += "server: " + htmlEsc(info.server) + "<br>";
+    setStatus(html);
+  }, function(msg) {
+    stopSend();
+    setStatus("<strong>Failed to get whois info: " + htmlEsc(msg) + "</strong>");
+  });
+}
 
 function timeFor(str) {
   return Number(str.slice(0, 10));
@@ -32,14 +81,15 @@ function stopSend() {
 
 // API wrappers
 
-function sendCommand(cmd, args, body, done, backOff) {
+function sendCommand(cmd, args, body, backOff) {
   var url = document.location.href + "send/" + encodeURIComponent(cmd);
   for (var i = 0; i < args.length; ++i)
     url += "/" + encodeURIComponent(args[i]);
-  httpRequest(url, {body: body, method: "POST"}, function() {done();}, function(msg) {
+  startSend();
+  httpRequest(url, {body: body, method: "POST"}, stopSend, function(msg) {
     console.log("Sending failed: " + msg);
     var time = Math.min((backOff || 2) * 2, 30);
-    setTimeout(function() {sendCommand(cmd, args, done, time);}, time * 1000);
+    setTimeout(function() {sendCommand(cmd, args, time);}, time * 1000);
   });
 }
 
@@ -51,6 +101,10 @@ function getHistory(from, to, skip, c, err) {
 
 function getNames(c, err) {
   httpRequest(document.location.href + "names", {}, c, err);
+}
+
+function getWhoIs(name, c, err) {
+  httpRequest(document.location.href + "whois/" + encodeURIComponent(name), {}, c, err);
 }
 
 var knownHistory = [], knownUpto;
@@ -71,6 +125,18 @@ function fetchData() {
   }, function(msg) {
     document.body.innerHTML = "Failed to connect to Presence server (" + msg + ")";
   });
+}
+
+var closeStatusOnInput = false;
+function setStatus(html, closeOnInput) {
+  var atBottom = isScrolledToBottom();
+  closeStatusOnInput = closeOnInput;
+  $("status").innerHTML = html;
+  $("statuswrap").style.height = $("status").offsetHeight + "px";
+  if (atBottom && html) var tick = 0, scroll = setInterval(function() {
+    document.body.scrollTop = document.body.scrollHeight;
+    if (++tick == 11) clearInterval(scroll);
+  }, 100);
 }
 
 function buildColor(hue, sat, light) {
@@ -116,7 +182,7 @@ var curState = {prevName: null, names: {}};
 function processLine(state, line) {
   var type = line.charAt(11), html = "";
   var col = line.indexOf(":", 13);
-  if (col > -1) var name = line.slice(13, col), msg = line.slice(col + 1);
+  if (col > -1) var name = line.slice(13, col), msg = line.slice(col + 2);
   else var msg = line.slice(13);
 
   if (type == "_" || type == ">" || (type == "n" && name)) {
@@ -127,7 +193,9 @@ function processLine(state, line) {
       state.prevName = name;
       html += "<div class=name>" + htmlEsc(name) + "</div>";
     }
-    html += htmlEsc(msg) + "</div>"
+    var act = msg.match(/^\01ACTION (.*)\01$/);
+    if (act) html += "<em>" + htmlEsc(act[1]) + "</em></div>"
+    else  html += htmlEsc(msg) + "</div>"
   } else if (type == "<") {
     var newName = state.prevName != "to " + name;
     html += "<div style=\"border-left: 2px solid " + selfColor +

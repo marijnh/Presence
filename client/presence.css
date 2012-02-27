@@ -12,6 +12,7 @@ h1 {
 div#output > div {
   overflow: visible;
   padding: 0 .5em;
+  white-space: pre-wrap;
 }
 
 div#output > div.priv {
@@ -36,4 +37,42 @@ textarea#input {
   font-size: inherit;
   padding: 0 .5em;
   margin-top: 1px;
+}
+
+div#statuswrap {
+  overflow: hidden;
+  height: 0px;
+  -moz-transition: height 1s; 
+  -webkit-transition: height 1s;  
+  -ms-transition: height 1s;  
+  -o-transition: height 1s;  
+  transition: height 1s;
+  position: relative;
+  border-left: 2px solid transparent;
+  padding: 0 .5em;
+}
+
+div#statusclose {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  font-family: monospace;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+div#status {
+  color: #666;
+}
+
+div.names {
+  -webkit-column-width: 15em;
+  -moz-column-width: 15em;
+  -ie-column-width: 15em;
+  column-width: 15em;
+}
+
+div.names > div {
+  cursor: pointer;
+  color: #44c;
 }

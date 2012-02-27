@@ -8,8 +8,12 @@
     <script>var channel = "$chan$", nick = "$nick$";</script>
     <link rel="stylesheet" href="presence.css">
   </head><body>
-    <div id=output></div>
+    <div id=output>Loading...</div>
     <div class="name"><em>$nick$</em></div>
-    <textarea id=input rows=3></textarea>
+    <textarea id=input rows=2></textarea>
+    <div id=statuswrap>
+      <div id=statusclose>[×]</div>
+      <div id=status title=Close></div>
+    </div>
   </body>
 </html>
