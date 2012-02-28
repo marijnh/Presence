@@ -375,7 +375,7 @@ function timeAtScrollPos(at) {
       node = output.childNodes[mid];
       var top = node.offsetTop, bot = top + node.offsetHeight;
       if (top > pos) hi = mid;
-      else if (bot >= pos) break;
+      else if (bot >= pos || lo == mid) break;
       else lo = mid;
     }
   }
