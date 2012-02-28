@@ -422,16 +422,33 @@ function addLines(lines) {
   if (atBottom && winFocused) window.scrollTo(0, document.body.scrollHeight);
 }
 
-function poll(backOff) {
+var pollGeneration = 0, lastPoll;
+function poll() { poll_(pollGeneration, 2); }
+function poll_(generation, backOff) {
+  if (pollGeneration != generation) return;
+  lastPoll = new Date().getTime();
   var skip = 0;
   while (skip < knownHistory.length &&
          timeFor(knownHistory[knownHistory.length - 1 - skip]) == knownUpto)
     ++skip;
   getHistory(knownUpto, null, skip, function(lines) {
     addLines(lines);
-    poll();
-  }, function() {
-    var time = Math.min((backOff || 2) * 2, 30);
-    setTimeout(function() {poll(time);}, time * 1000);
+    poll_(generation, 2);
+  }, function(msg) {
+    console.log("Polling failed: " + msg);
+    var time = Math.min(backOff * 2, 30);
+    setTimeout(function() {poll_(generation, time);}, time * 1000);
   });
 }
+
+// Try to notice when the computer has gone to sleep and resumed
+// again, which tends to kill long-polling requests, or some other
+// circumstance has messed with our polling.
+setInterval(function() {
+  var now = new Date().getTime();
+  if (now - lastPoll > 90000) {
+    console.log("Resetting polling");
+    ++pollGeneration;
+    poll();
+  }
+}, 60000);
