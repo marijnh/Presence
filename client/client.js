@@ -76,6 +76,8 @@ window.onload = function() {
     if (e.target.parentNode == output && e.target.lastChild.className == "date")
       e.target.removeChild(e.target.lastChild);
   });
+  connect(window, "scroll", scrolled);
+
   fetchData();
 };
 
@@ -203,7 +205,6 @@ function fetchData() {
         for (var cur = output.firstChild; cur; cur = cur.nextSibling)
           if (timeFor(cur.logLine) >= btime) break;
       if (output.lastChild) window.scrollTo(0, maxScroll = (cur || output.lastChild).offsetTop - 10);
-      connect(window, "scroll", scrolled);
 
       getNames(function(names) {
         curState.names = {};
