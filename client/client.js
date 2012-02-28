@@ -308,7 +308,8 @@ function processLine(state, line) {
     var msgHTML = act ? "<em>" + htmlEsc(act[1]) + "</em>" : htmlEsc(msg);
     if (msgHTML.indexOf(nick) > -1) {
       direct = true;
-      msgHTML = msgHTML.replace(nick, "<span class=mention>" + nick + "</span>");
+      msgHTML = msgHTML.replace(new RegExp("\\b(" + nick + ")\\b", "gi"),
+                                "<span class=mention>$1</span>");
     }
     msgHTML = msgHTML.replace(/\b((?:[a-z][\w-]+:(?:\/{1,3}|[a-z0-9%])|www\d{0,3}\.|[a-z0-9.\-]+\.[a-z]{2,4}\/)(?:[^\s()<>]+)+[^\s`!()\[\]{};:'".,<>?])\b/g, function(url) {
       return "<a href=\"" + url + "\">" + url + "</a>";
