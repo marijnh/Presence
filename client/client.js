@@ -40,7 +40,8 @@ window.onload = function() {
         } else {
           var appendCol = start ? "" : ":";
           forEachIn(curState.names, function(key) {
-            if (key.slice(0, frag.length) == frag) completions.push(key + appendCol);
+            if (curState.names[key] && key.slice(0, frag.length) == frag)
+              completions.push(key + appendCol);
           });
         }
         if (completions.length == 1) {
@@ -325,6 +326,7 @@ function processLine(state, line) {
   }
 
   if (type == "_" || type == ">") {
+    if (type == ">") curState.lastDirect = name;
     return buildOutput(name, type == ">", type == ">", msg);
   } else if (type == "<") {
     return buildOutput("⇝" + name, true, false, msg); 
