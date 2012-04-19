@@ -427,16 +427,17 @@ function addLines(lines) {
 var pollGeneration = 0, lastPoll;
 function poll() { poll_(pollGeneration, 2); }
 function poll_(generation, backOff) {
-  if (pollGeneration != generation) return;
   lastPoll = new Date().getTime();
   var skip = 0;
   while (skip < knownHistory.length &&
          timeFor(knownHistory[knownHistory.length - 1 - skip]) == knownUpto)
     ++skip;
   getHistory(knownUpto, null, skip, function(lines) {
+    if (pollGeneration != generation) return;
     addLines(lines);
     poll_(generation, 2);
   }, function(msg) {
+    if (pollGeneration != generation) return;
     console.log("Polling failed: " + msg);
     var time = Math.min(backOff * 2, 30);
     setTimeout(function() {poll_(generation, time);}, time * 1000);
